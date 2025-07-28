@@ -1,0 +1,656 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🌾 AI Agri Assistant</title>
+    <style>
+        /* === BASE STYLES === */
+        :root {
+            --primary-color: #27ae60;
+            --primary-hover: #1e8449;
+            --secondary-color: #1e272e;
+            --light-bg: #f1f5f9;
+            --white-bg: #ffffff;
+            --text-dark: #2c3e50;
+            --text-light: #333;
+            --border-color: #ccc;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--light-bg);
+            color: var(--text-light);
+            margin: 0;
+            padding: 0;
+            display: flex;
+        }
+
+        /* === LOADING OVERLAY (For better UX) === */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+            display: none; /* Hidden by default */
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+        .spinner {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid var(--primary-color);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* === LAYOUT: HEADER & SIDEBAR === */
+        header {
+            position: fixed;
+            top: 0;
+            left: 200px;
+            right: 0;
+            background: linear-gradient(90deg, #2ecc71, var(--primary-color));
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200px;
+            height: 100%;
+            background-color: var(--secondary-color);
+            color: white;
+            padding-top: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            z-index: 999;
+        }
+        .sidebar a {
+            padding: 14px 20px;
+            color: white;
+            text-decoration: none;
+            width: 100%;
+            display: block;
+            box-sizing: border-box;
+            transition: background 0.3s;
+            font-weight: 500;
+        }
+        .sidebar a:hover {
+            background-color: #485460;
+        }
+
+        /* === CONTENT & CONTAINERS === */
+        .content {
+            margin-left: 200px;
+            padding-top: 90px;
+            width: calc(100% - 200px);
+        }
+        .container {
+            display: none;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding: 30px;
+        }
+        .box {
+            flex: 1 1 400px;
+            max-width: 600px;
+            background-color: var(--white-bg);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            min-height: 300px;
+        }
+        .box h2 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            color: var(--text-dark);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+        }
+
+        /* === FORMS & BUTTONS === */
+        input[type="file"], input[type="date"], input[type="time"], input[type="text"], input[type="email"], input[type="password"], input[type="number"], select, textarea {
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            width: 100%;
+            font-size: 1rem;
+            margin-top: 8px;
+            box-sizing: border-box;
+            background-color: #fdfdfd;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 5px rgba(46, 204, 113, 0.5);
+        }
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        button {
+            margin-top: 15px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--primary-color);
+            color: var(--white-bg);
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+        button:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* === RESULT & FEEDBACK STYLES === */
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid var(--border-color);
+            font-size: 1rem;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
+        .result-box.success { border-color: green; }
+        .result-box.error { border-color: red; color: red; }
+        .result-box.info { border-color: #0dcaf0; }
+
+        ul#price-list {
+            list-style: none;
+            padding-left: 0;
+            margin-top: 15px;
+        }
+        ul#price-list li {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        ul#price-list li::before {
+            content: "🛒 ";
+            margin-right: 5px;
+        }
+        .search-result-item {
+            border: 1px solid #eee;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .search-result-item img {
+            width: 100%;
+            max-width: 250px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            object-fit: cover;
+        }
+
+        /* === RESPONSIVE DESIGN === */
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; position: relative; flex-direction: row; overflow-x: auto; padding-top: 0; }
+            .sidebar a { flex: 1; text-align: center; padding: 15px 5px; }
+            header { position: relative; left: 0; }
+            .content { margin-left: 0; padding-top: 20px; width: 100%; }
+            .box { max-width: 100%; flex-basis: 100%; }
+            .buysell-container { flex-direction: column !important; }
+            .buysell-container .box { width: 100% !important; }
+        }
+    </style>
+
+    <!-- SCRIPT LIBRARIES: Firebase is all that's needed for the frontend logic. -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div id="loading-overlay"><div class="spinner"></div></div>
+
+    <div class="sidebar">
+        <!-- The onclick attributes now call methods on the global 'App' object -->
+        <a href="#" onclick="App.showSection('disease')">🍃 Crop Disease</a>
+        <a href="#" onclick="App.showSection('weather')">🌤 Weather</a>
+        <a href="#" onclick="App.showSection('prices')">🥕 Prices</a>
+        <a href="#" onclick="App.showSection('planner')">🧠 AI Planner</a>
+        <a href="#" onclick="App.showSection('buysell')">🏠 Buy/Sell</a>
+        <a href="#" onclick="App.showSection('login')">🔐 Login</a>
+    </div>
+
+    <header><h1>🌿 AI Agri Assistant</h1></header>
+
+    <div class="content">
+
+  <!-- 🍃 Leaf Disease Predictor -->
+  <div class="container disease" id="disease">
+    <div class="box">
+      <h2>🍃 Leaf Disease Predictor</h2>
+      <p style="font-size: 0.9em; color: #666;">This feature communicates with your local backend server.</p>
+      
+      <form id="disease-form" enctype="multipart/form-data">
+        <input type="file" name="leaf" class="form-control" id="leafImage" accept="image/*" required />
+
+        <button type="submit">🔍 Predict</button>
+      </form>
+      <div id="disease-result" class="result-box"></div>
+    </div>
+  </div>
+
+  <!-- 🌤 Weather Forecast -->
+  <div class="container weather" id="weather">
+    <div class="box">
+      <h2>🌤 Weather Forecast</h2>
+      <p style="font-size: 0.9em; color: #666;">This feature communicates with your local backend server.</p>
+      <label for="weather-date">📅 Select Date:</label>
+      <input type="date" id="weather-date" /><br><br>
+      <label for="weather-time">⏰ Select Time:</label>
+      <input type="time" id="weather-time" /><br><br>
+      <button onclick="App.getWeather()">📍 Get Forecast</button>
+      <div id="weather-output" class="result-box"></div>
+    </div>
+  </div>
+
+  <!-- 🥕 Vegetable Price Tracker -->
+  <div class="container prices" id="prices">
+    <div class="box">
+      <h2>🥕 Vegetable Price Tracker</h2>
+      <p style="font-size: 0.9em; color: #666;">This feature communicates with your local backend server.</p>
+      <label for="veg-name">🥬 Vegetable Name:</label>
+      <input type="text" id="veg-name" placeholder="e.g. Tomato" /><br><br>
+      <label for="veg-location">📍 Market/City:</label>
+      <input type="text" id="veg-location" placeholder="e.g. Dharmapuri" /><br><br>
+      <button onclick="App.getPrices()">📦 Get Price</button>
+      <ul id="price-list" class="result-box"></ul>
+    </div>
+  </div>
+
+  <!-- 🧠 AI Planner -->
+  <div class="container planner" id="planner">
+    <div class="box">
+      <h2>🧠 AI Planner</h2>
+      <p style="font-size: 0.9em; color: #666;">This feature communicates with your local backend server.</p>
+      <label for="crop">🌾 Crop Name:</label>
+      <input type="text" id="crop" placeholder="e.g. Wheat" /><br><br>
+      <label for="area">📏 Land Area (in acres):</label>
+      <input type="number" id="area" placeholder="e.g. 2.5" /><br><br>
+      <label for="season">⛅ Current Season:</label>
+      <select id="season">
+        <option value="">-- Select --</option>
+        <option value="kharif">Kharif</option>
+        <option value="rabi">Rabi</option>
+        <option value="summer">Summer</option>
+      </select><br><br>
+      <button onclick="App.getPlan()">💡 Get Suggestion</button>
+      <div id="planner-output" class="result-box"></div>
+    </div>
+  </div>
+
+  <!-- 🔐 User Login / Register -->
+  <div class="container login" id="login">
+    <div class="box">
+      <h2>🔐 User Login / Register</h2>
+      <label for="email">Email:</label>
+      <input type="email" id="email" placeholder="Enter email" /><br><br>
+      <label for="password">Password:</label>
+      <input type="password" id="password" placeholder="Enter password" /><br><br>
+      <button onclick="App.registerUser()">📝 Register</button>
+      <button onclick="App.loginUser()">🔓 Login</button>
+      <button onclick="App.logoutUser()">🚪 Logout</button>
+      <div id="auth-status" class="result-box"></div>
+    </div>
+  </div>
+
+  <!-- 🛒 Buy & Sell -->
+  <div class="container buysell-container" id="buysell" style="display: flex; flex-direction: row; gap: 4%;">
+    <div class="box" style="width: 48%;">
+      <h2>📤 Sell an Item</h2>
+      <label for="sell-date">📅 Select Date:</label>
+      <input type="date" id="sell-date"><br><br>
+      <label for="item-image">🖼️ Upload Image:</label>
+      <input type="file" id="item-image" accept="image/*"><br><br>
+      <label for="item-desc">📋 Description:</label>
+      <textarea id="item-desc" rows="4" placeholder="e.g. 50kg Husk for ₹300, Contact: 9876543210"></textarea><br><br>
+      <button onclick="App.uploadItem()">📤 Upload</button>
+      <button onclick="App.showMyPosts()">👤 My Posts</button>
+      <div id="upload-result" class="result-box"></div>
+    </div>
+
+    <div class="box" style="width: 48%;">
+      <h2>🔍 Buy Items</h2>
+      <label for="search-query">🔍 Search by Keyword:</label>
+      <input type="text" id="search-query" placeholder="e.g. husk"><br><br>
+      <label for="search-date">📅 Filter by Date:</label>
+      <input type="date" id="search-date"><br><br>
+      <button onclick="App.searchItems()">🔍 Search</button>
+      <div id="buysell-results" class="result-box"></div>
+    </div>
+  </div>
+
+</div>
+
+    <script>
+        const App = {
+            services: {
+                auth: null,
+                db: null,
+            },
+            elements: {
+                loadingOverlay: null
+            },
+            backendUrl: 'http://127.0.0.1:5000',
+
+            init: function() {
+                document.addEventListener('DOMContentLoaded', () => {
+                    this.initServices();
+                    this.cacheElements();
+                    this.bindEvents();
+                    this.services.auth.onAuthStateChanged(this.handleAuthStateChange.bind(this));
+                    this.showSection('disease');
+                });
+            },
+
+            initServices: function() {
+                const firebaseConfig = { apiKey: "AIzaSyCXK0KHqLhKVAAm5xr0ASbFKJM5IwVLeTY", authDomain: "agri--sps-project.firebaseapp.com", projectId: "agri--sps-project", storageBucket: "agri--sps-project.appspot.com", appId: "1:762110077628:web:9d219b9d67bbecf270beb9" };
+                firebase.initializeApp(firebaseConfig);
+                this.services.auth = firebase.auth();
+                this.services.db = firebase.firestore();
+            },
+
+            cacheElements: function() {
+                this.elements.loadingOverlay = document.getElementById('loading-overlay');
+            },
+
+            bindEvents: function() {
+                document.getElementById('disease-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.predictDisease(e.currentTarget);
+                });
+            },
+
+            showLoading: function() { if (this.elements.loadingOverlay) this.elements.loadingOverlay.style.display = 'flex'; },
+            hideLoading: function() { if (this.elements.loadingOverlay) this.elements.loadingOverlay.style.display = 'none'; },
+
+            showSection: function(sectionId) {
+                const sections = ['disease', 'weather', 'prices', 'planner', 'login', 'buysell'];
+                sections.forEach(id => {
+                    const container = document.getElementById(id);
+                    if (container) container.style.display = id === sectionId ? 'flex' : 'none';
+                });
+            },
+            
+            predictDisease: async function(form) {
+                const resultBox = document.getElementById('disease-result');
+                this.showLoading();
+                resultBox.innerHTML = "Analyzing leaf image...";
+                resultBox.className = 'result-box info';
+                try {
+                    const formData = new FormData(form);
+                    const res = await fetch(`${this.backendUrl}/predict`, { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Prediction failed.');
+                    resultBox.innerHTML = `<strong>Disease:</strong> ${data.disease}<br><strong>Remedy:</strong> ${data.remedy}`;
+                    resultBox.className = 'result-box success';
+                } catch (err) {
+                    resultBox.innerHTML = `❌ ${err.message}`;
+                    resultBox.className = 'result-box error';
+                } finally {
+                    this.hideLoading();
+                }
+            },
+            getWeather: async function() {
+                const output = document.getElementById('weather-output');
+                output.innerHTML = "Getting location...";
+                if (!navigator.geolocation) return output.innerHTML = "Geolocation not supported.";
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    const { latitude, longitude } = pos.coords;
+                    try {
+                        const res = await fetch(`${this.backendUrl}/weather?lat=${latitude}&lon=${longitude}`);
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Failed to get weather.');
+                        output.innerHTML = `<p><strong>City:</strong> ${data.city}</p><p><strong>Temperature:</strong> 🌡️ ${data.temp}°C</p><p><strong>Condition:</strong> ${data.condition}</p>`;
+                    } catch (err) { output.innerHTML = `<span style="color:red;">❌ ${err.message}</span>`; }
+                }, () => { output.innerHTML = `<span style="color:red;">Location access denied.</span>`; });
+            },
+            getPrices: async function() {
+                const vegetable = document.getElementById('veg-name').value.trim();
+                const location = document.getElementById('veg-location').value.trim();
+                const list = document.getElementById('price-list');
+                if (!vegetable || !location) { list.innerHTML = `<li style="color:red;">Please enter both a vegetable and a location.</li>`; return; }
+                list.innerHTML = "<li>Fetching prices...</li>";
+                try {
+                    const res = await fetch(`${this.backendUrl}/prices?vegetable=${encodeURIComponent(vegetable)}&location=${encodeURIComponent(location)}`);
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Failed to get prices.');
+                    list.innerHTML = "";
+                    if (data.prices.length > 0) {
+                        data.prices.forEach(item => {
+                            const li = document.createElement('li');
+                            li.textContent = `🥬 ${item.name} in ${item.location}: ₹${item.price} / kg`;
+                            list.appendChild(li);
+                        });
+                    } else { list.innerHTML = `<li>🧐 No price data found for ${vegetable} in ${location}.</li>`; }
+                } catch (err) { list.innerHTML = `<li style="color:red;">❌ ${err.message}</li>`; }
+            },
+            getPlan: async function() {
+                const crop = document.getElementById('crop').value.trim();
+                const area = document.getElementById('area').value.trim();
+                const season = document.getElementById('season').value;
+                const output = document.getElementById('planner-output');
+                if (!crop || !area || !season) { output.innerHTML = `<span style="color:red;">Please fill all fields.</span>`; return; }
+                output.innerHTML = "Generating suggestion...";
+                try {
+                    const res = await fetch(`${this.backendUrl}/planner?crop=${encodeURIComponent(crop)}&area=${area}&season=${encodeURIComponent(season)}`);
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Failed to get plan.');
+                    output.innerHTML = `<p><strong>📌 Suggestion:</strong></p><p>${data.suggestion.replace(/\n/g, "<br>")}</p><p><strong>💰 Estimated Cost:</strong> ${data.estimated_cost}</p><p><strong>✅ Extra Tips:</strong> ${data.tips}</p>`;
+                } catch (err) { output.innerHTML = `<span style="color:red;">❌ ${err.message}</span>`; }
+            },
+
+            // --- AUTHENTICATION ---
+            registerUser: function() {
+                const email = document.getElementById("email").value.trim();
+                const password = document.getElementById("password").value.trim();
+                const status = document.getElementById('auth-status');
+                status.className = 'result-box';
+                if(!email || !password) { status.innerHTML = `❌ Email and password cannot be empty.`; status.className = 'result-box error'; return; }
+                this.services.auth.createUserWithEmailAndPassword(email, password)
+                    .then(() => { status.innerHTML = "✅ Registered Successfully!"; status.className = 'result-box success'; })
+                    .catch(error => { status.innerHTML = `❌ ${error.message}`; status.className = 'result-box error'; });
+            },
+            loginUser: function() {
+                const email = document.getElementById("email").value.trim();
+                const password = document.getElementById("password").value.trim();
+                const status = document.getElementById('auth-status');
+                status.className = 'result-box';
+                if(!email || !password) { status.innerHTML = `❌ Email and password cannot be empty.`; status.className = 'result-box error'; return; }
+                this.services.auth.signInWithEmailAndPassword(email, password)
+                    .then(() => { status.innerHTML = "✅ Logged In!"; status.className = 'result-box success'; })
+                    .catch(error => { status.innerHTML = `❌ ${error.message}`; status.className = 'result-box error'; });
+            },
+            logoutUser: function() {
+                this.services.auth.signOut().then(() => {
+                    const status = document.getElementById('auth-status');
+                    status.innerHTML = "👋 Logged Out!";
+                    status.className = 'result-box info';
+                });
+            },
+            handleAuthStateChange: function(user) {
+                const status = document.getElementById('auth-status');
+                if(!status) return;
+                if (user) {
+                    status.innerHTML = `🟢 Logged in as: ${user.email}`;
+                    status.className = 'result-box success';
+                } else {
+                    status.innerHTML = `🔴 Not logged in`;
+                    status.className = 'result-box info';
+                }
+            },
+            
+            // =====================================================================
+            // ===               BUY/SELL WITH CLOUDINARY LOGIC                  ===
+            // =====================================================================
+                        // =====================================================================
+            // ===        BUY/SELL LOGIC (WITH LOADING ANIMATION REMOVED)        ===
+            // =====================================================================
+            uploadItem: async function() {
+                const resultBox = document.getElementById("upload-result");
+                const imageInput = document.getElementById("item-image");
+                const desc = document.getElementById("item-desc").value.trim();
+                const date = document.getElementById("sell-date").value;
+                const user = this.services.auth.currentUser;
+
+                // --- 1. Initial Validations ---
+                if (!user) {
+                    resultBox.innerHTML = `⚠️ Please log in to sell an item.`;
+                    resultBox.className = 'result-box error';
+                    this.showSection('login');
+                    return;
+                }
+                if (!imageInput.files.length || !desc || !date) {
+                    resultBox.innerHTML = `⚠️ Please fill all fields and select an image.`;
+                    resultBox.className = 'result-box error';
+                    return;
+                }
+
+                // this.showLoading(); // <-- CHANGE HERE: Comment out this line
+                resultBox.innerHTML = `⏳ Uploading... please wait.`;
+                resultBox.className = 'result-box info';
+                
+                const file = imageInput.files[0];
+                const formData = new FormData();
+                formData.append('item_image', file);
+                
+                try {
+                    // --- Step 2: Upload image to our backend ---
+                    const uploadResponse = await fetch(`${this.backendUrl}/upload-item-image`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!uploadResponse.ok) {
+                        const errorData = await uploadResponse.json().catch(() => ({ error: "Server returned an invalid error response." }));
+                        throw new Error(errorData.error || `Image upload failed with status code: ${uploadResponse.status}`);
+                    }
+                    
+                    const uploadData = await uploadResponse.json();
+                    const imageUrl = uploadData.imageUrl;
+                    
+                    if (!imageUrl || !imageUrl.startsWith('https')) {
+                        throw new Error("The server did not return a valid Cloudinary image URL.");
+                    }
+                    
+                    resultBox.innerHTML = `✅ Your item has been listed successfully!`;
+
+                    // --- Step 3: Save item metadata to Firestore ---
+                    await this.services.db.collection("items").add({
+                        description: desc,
+                        lowercase_desc: desc.toLowerCase(),
+                        date: date,
+                        imageUrl: imageUrl,
+                        userId: user.uid,
+                        userEmail: user.email,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    // --- Success State ---
+                    resultBox.innerHTML = `✅ Your item has been listed successfully!`;
+                    resultBox.className = 'result-box success';
+
+                    imageInput.value = "";
+                    document.getElementById("item-desc").value = "";
+                    document.getElementById("sell-date").value = "";
+
+                    this.showMyPosts();
+
+                } catch (error) {
+                    console.error("Full Upload Process Error:", error);
+                    let userMessage = `❌ A problem occurred.`;
+                    if (error.message.includes("permission-denied") || error.message.includes("Missing or insufficient permissions")) {
+                        userMessage += ` The database rejected the save operation. <strong>Please check your Firestore Security Rules in the Firebase Console.</strong>`;
+                    } else {
+                        userMessage += ` Please check the browser console for technical details.`;
+                    }
+                    userMessage += `<br><br><strong>Error:</strong> ${error.message}`;
+
+                    resultBox.innerHTML = userMessage;
+                    resultBox.className = 'result-box error';
+                } 
+                // We no longer need the 'finally' block just for the spinner
+                // finally {
+                //     this.hideLoading(); // <-- CHANGE HERE: Comment out this line
+                // }
+            },
+            // --- Functions for viewing Buy/Sell items ---
+            showMyPosts: async function() {
+                const user = this.services.auth.currentUser;
+                const resultsBox = document.getElementById("buysell-results");
+                if (!user) { resultsBox.innerHTML = `<p style="color:red;">⚠️ Please log in to see your posts.</p>`; this.showSection('login'); return; }
+                resultsBox.innerHTML = "🔄 Fetching your posts...";
+                try {
+                    const query = this.services.db.collection("items").where("userId", "==", user.uid).orderBy("timestamp", "desc");
+                    const snapshot = await query.get();
+                    if (snapshot.empty) { resultsBox.innerHTML = "<h3>My Posts:</h3><p>🤔 You haven't posted any items yet.</p>"; return; }
+                    resultsBox.innerHTML = "<h3>My Posts:</h3>";
+                    snapshot.forEach(doc => this.renderItem(doc, resultsBox));
+                } catch (error) { resultsBox.innerHTML = `<p style="color:red;">❌ Error fetching posts: ${error.message}</p>`; }
+            },
+            searchItems: async function() {
+                const queryText = document.getElementById("search-query").value.trim().toLowerCase();
+                const searchDate = document.getElementById("search-date").value;
+                const resultsBox = document.getElementById("buysell-results");
+                resultsBox.innerHTML = "🔄 Searching...";
+                try {
+                    let query = this.services.db.collection("items").orderBy("timestamp", "desc");
+                    if (queryText) { query = query.where('lowercase_desc', '>=', queryText).where('lowercase_desc', '<=', queryText + '\uf8ff'); }
+                    if (searchDate) { query = query.where("date", "==", searchDate); }
+                    const snapshot = await query.limit(25).get();
+                    if (snapshot.empty) { resultsBox.innerHTML = "<p>🧐 No items found matching your criteria.</p>"; return; }
+                    resultsBox.innerHTML = "";
+                    snapshot.forEach(doc => this.renderItem(doc, resultsBox));
+                } catch (error) { resultsBox.innerHTML = `<p style="color:red;">❌ Error searching: ${error.message}. You may need to create a Firestore index.</p>`; }
+            },
+            renderItem: function(doc, container) {
+                const item = doc.data();
+                const itemEl = document.createElement("div");
+                itemEl.className = 'search-result-item';
+                itemEl.innerHTML = `<img src="${item.imageUrl}" alt="Item image" loading="lazy"><p><strong>Posted on:</strong> ${item.date}</p><p>${item.description}</p><p><small>Seller: ${item.userEmail || 'N/A'}</small></p>`;
+                container.appendChild(itemEl);
+            }
+        };
+
+        // This single line starts the entire application.
+        App.init();
+
+    </script>
+</body>
+</html>
